@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+*.log
+BACKUP_*/
+BACKUP_*.tar.gz
+*.pid
+d4-health.json
+stage5_register.json
+stage5_response.json
+stage5_timestamp_trip.json
+stage5_trip.json
+package.json.stage4.bak
+*.bak

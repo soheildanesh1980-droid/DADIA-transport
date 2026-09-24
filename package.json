@@ -1,0 +1,32 @@
+{
+  "name": "dadia-transport",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "tsx src/database/migrate.ts",
+    "migrate:stage4": "node dist/database/migrate-stage4.js",
+    "test:stage4": "bash scripts/test-stage4.sh"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.2",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.3",
+    "express": "^5.2.1",
+    "ioredis": "^6.0.0",
+    "pg": "^8.23.0"
+  }
+}
