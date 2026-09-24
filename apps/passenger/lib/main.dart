@@ -99,47 +99,48 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
   final phone = TextEditingController();
-  final password = TextEditingController();
-  final confirm = TextEditingController();
   CountryConfig country = CountryConfigs.supported.first;
   bool loading = false;
   String? error;
 
   Future<void> register() async {
-    setState(() { loading = true; error = null; });
+    setState(() {
+      loading = true;
+      error = null;
+    });
+
     try {
-      final p = phone.text.trim();
-      if (!RegExp(r'^9\d{9}$').hasMatch(p) &&
-          !RegExp(r'^09\d{9}$').hasMatch(p) &&
-          !RegExp(r'^\+989\d{9}$').hasMatch(p)) {
-        throw Exception('شماره موبایل معتبر ایران را وارد کنید');
-      }
-      if (password.text.length < 8) {
-        throw Exception('رمز عبور باید حداقل ۸ کاراکتر باشد');
-      }
-      if (password.text != confirm.text) {
-        throw Exception('تکرار رمز عبور یکسان نیست');
-      }
-      if (country.code != 'IR') {
-        throw Exception('ثبت نام این نسخه در Backend فعلی فقط برای ایران فعال است');
+      final raw = phone.text.trim();
+
+      if (raw.isEmpty) {
+        throw Exception('شماره تلفن را وارد کنید');
       }
 
-      await auth.register(p, password.text);
-      if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomePage()),
-        (_) => false,
-      );
+      final normalized = raw.replaceAll(RegExp(r'[^0-9+]'), '');
+      final fullPhone = normalized.startsWith('+')
+          ? normalized
+          : '${country.dialCode}${normalized.replaceFirst(RegExp(r'^0+'), '')}';
+
+      if (fullPhone.length < country.dialCode.length + 6) {
+        throw Exception('شماره تلفن معتبر وارد کنید');
+      }
+
+      // OTP واقعی پس از فعال شدن سرویس SMS متصل خواهد شد.
+      throw Exception('OTP_SERVICE_PENDING');
     } catch (e) {
-      if (mounted) setState(() => error = _cleanError(e));
+      if (mounted) {
+        setState(() => error = _cleanError(e));
+      }
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted) {
+        setState(() => loading = false);
+      }
     }
   }
 
   @override
   void dispose() {
-    phone.dispose(); password.dispose(); confirm.dispose(); super.dispose();
+    phone.dispose(); super.dispose();
   }
 
   @override
@@ -170,25 +171,16 @@ class _RegisterPageState extends State<RegisterPage> {
             onChanged: loading ? null : (value) { if (value != null) setState(() => country = value); },
           ),
           const SizedBox(height: 14),
-          phoneField(phone, hint: 'مثال: 09121234567'),
+          phoneField(phone, hint: 'شماره تلفن بدون کد کشور'),
           const SizedBox(height: 14),
-          passwordField(password, label: 'رمز عبور'),
-          const SizedBox(height: 14),
-          passwordField(confirm, label: 'تکرار رمز عبور'),
           if (error != null) errorText(error!),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
               onPressed: loading ? null : register,
-              child: Text(loading ? 'در حال ثبت نام...' : 'ثبت نام'),
+              child: Text(loading ? 'در حال ارسال کد...' : 'دریافت کد تایید'),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'این نسخه OTP را شبیه سازی نمی‌کند؛ Backend فعلی پس از ثبت نام Token واقعی برمی‌گرداند.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
       ),
