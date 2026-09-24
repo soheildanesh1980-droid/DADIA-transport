@@ -1,11 +1,9 @@
+import 'core/config/app_config.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-const apiBase = String.fromEnvironment(
-  'DADIA_API_BASE_URL',
-  defaultValue: 'http://10.0.2.2:3000',
-);
+const apiBase = AppConfig.apiBaseUrl;
 
 void main() {
   runApp(const DadiaPassengerApp());
