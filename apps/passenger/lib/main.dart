@@ -213,9 +213,9 @@ class _RegisterPageState extends State<RegisterPage> {
         children: [
           DropdownButtonFormField<CountryConfig>(
             initialValue: country,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: AppLocalization.text(languageController.code, 'country'),
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(),
             ),
             isExpanded: true,
             items: CountryConfigs.supported.map((c) => DropdownMenuItem(
