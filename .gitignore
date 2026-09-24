@@ -12,3 +12,12 @@ stage5_timestamp_trip.json
 stage5_trip.json
 package.json.stage4.bak
 *.bak
+
+# Flutter
+apps/**/.dart_tool/
+apps/**/build/
+apps/**/.flutter-plugins
+apps/**/.flutter-plugins-dependencies
+apps/**/.packages
+apps/**/android/.gradle/
+apps/**/android/local.properties
