@@ -1,5 +1,6 @@
 import 'core/config/app_config.dart';
 import 'core/network/api_client.dart';
+import 'core/auth/auth_service.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 
@@ -28,6 +29,7 @@ class DadiaPassengerApp extends StatelessWidget {
 
 
 final api = ApiClient();
+final auth = AuthService(api);
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -49,7 +51,7 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      await api.login(phone.text.trim(), password.text);
+      await auth.login(phone.text.trim(), password.text);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const HomePage()),
