@@ -6,9 +6,9 @@ import { pool } from "./postgres.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const sourceMigration = path.resolve(
+const migrationsDir = path.resolve(
   __dirname,
-  "../../src/database/migrations/001_initial_schema.sql"
+  "../../src/database/migrations"
 );
 
 async function migrate() {
@@ -25,15 +25,30 @@ async function migrate() {
       )
     `);
 
-    const name = "001_initial_schema.sql";
+    const files = (await fs.readdir(migrationsDir))
+      .filter((name) => /^\d+_.*\.sql$/.test(name))
+      .sort((a, b) => {
+        const na = Number(a.match(/^\d+/)?.[0] ?? 0);
+        const nb = Number(b.match(/^\d+/)?.[0] ?? 0);
+        return na - nb;
+      });
 
-    const existing = await client.query(
-      "SELECT 1 FROM schema_migrations WHERE name = $1",
-      [name]
-    );
+    for (const name of files) {
+      const existing = await client.query(
+        "SELECT 1 FROM schema_migrations WHERE name = $1",
+        [name]
+      );
 
-    if (existing.rowCount === 0) {
-      const sql = await fs.readFile(sourceMigration, "utf8");
+      if ((existing.rowCount ?? 0) > 0) {
+        console.log("Migration already applied:", name);
+        continue;
+      }
+
+      const sql = await fs.readFile(
+        path.join(migrationsDir, name),
+        "utf8"
+      );
+
       await client.query(sql);
 
       await client.query(
@@ -42,12 +57,10 @@ async function migrate() {
       );
 
       console.log("Migration applied:", name);
-    } else {
-      console.log("Migration already applied:", name);
     }
 
     await client.query("COMMIT");
-    console.log("Migration completed successfully.");
+    console.log("All migrations completed successfully.");
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Migration failed:", error);

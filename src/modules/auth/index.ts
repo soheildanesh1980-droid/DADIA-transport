@@ -13,15 +13,9 @@ function jwtSecret(): string {
   return secret;
 }
 
-function normalizePhone(value: unknown): string {
-  const phone = String(value ?? "").trim().replace(/\s+/g, "");
-  if (!/^(\+98|0098|98|0)?9\d{9}$/.test(phone)) throw new Error("شماره موبایل نامعتبر است");
-  if (phone.startsWith("+98")) return "0" + phone.slice(3);
-  if (phone.startsWith("0098")) return "0" + phone.slice(4);
-  if (phone.startsWith("98")) return "0" + phone.slice(2);
-  if (phone.startsWith("9")) return "0" + phone;
-  return phone;
-}
+import { normalizePhone } from "./phone.js";
+import { createOtp, verifyOtp } from "./otp.js";
+import { getSmsProvider } from "./providers/index.js";
 
 function validatePassword(password: unknown): string {
   const value = String(password ?? "");
@@ -66,55 +60,347 @@ async function issueTokens(user: any) {
   return { accessToken, refreshToken };
 }
 
-router.post("/register", async (req, res) => {
+router.post("/register/request-otp", async (req, res) => {
   try {
     const phone = normalizePhone(req.body?.phone);
-    const password = validatePassword(req.body?.password);
-    const requestedRole = String(req.body?.role ?? "passenger").toLowerCase();
-    const role = requestedRole === "driver" ? "driver" : "passenger";
 
     const existing = await pool.query(
       `SELECT id FROM users WHERE phone = $1 LIMIT 1`,
       [phone]
     );
-    if (existing.rowCount) {
-      return res.status(409).json({ ok: false, error: "این شماره قبلا ثبت شده است" });
+
+    if ((existing.rowCount ?? 0) > 0) {
+      return res.status(409).json({
+        ok: false,
+        error: "phone_already_registered"
+      });
     }
 
-    const passwordHash = await hashPassword(password);
+    const smsProvider = getSmsProvider();
+
+    if (!smsProvider) {
+      return res.status(503).json({
+        ok: false,
+        error: "sms_provider_not_configured"
+      });
+    }
+
+    const otp = await createOtp(phone, "registration");
+
+    const smsResult = await smsProvider.sendOtp({
+      phone,
+      code: otp.code,
+      locale: String(req.body?.locale ?? "fa")
+    });
+
+    if (!smsResult.success) {
+      return res.status(502).json({
+        ok: false,
+        error: "sms_send_failed"
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      phone,
+      expires_at: otp.expires_at,
+      message: "otp_sent",
+      provider_message_id: smsResult.providerMessageId
+    });
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "otp_error"
+    });
+  }
+});
+
+router.post("/register/verify-otp", async (req, res) => {
+  try {
+    const phone = normalizePhone(req.body?.phone);
+    const code = String(req.body?.code ?? "").trim();
+
+    await verifyOtp(phone, code, "registration");
+
+    const verificationToken = createToken(
+      {
+        sub: phone,
+        role: "passenger",
+        type: "access",
+        phone,
+        purpose: "passenger_registration"
+      } as any,
+      jwtSecret(),
+      600
+    );
+
+    return res.json({
+      ok: true,
+      phone,
+      verified: true,
+      verificationToken
+    });
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "otp_error"
+    });
+  }
+});
+
+router.post("/register/complete-otp", async (req, res) => {
+  try {
+    const verificationToken = String(req.body?.verificationToken ?? "").trim();
+
+    if (!verificationToken) {
+      return res.status(400).json({
+        ok: false,
+        error: "registration_verification_token_required"
+      });
+    }
+
+    const payload = verifyToken<any>(verificationToken, jwtSecret());
+
+    if (
+      payload.purpose !== "passenger_registration" ||
+      payload.role !== "passenger" ||
+      payload.type !== "access" ||
+      typeof payload.phone !== "string"
+    ) {
+      return res.status(401).json({
+        ok: false,
+        error: "invalid_registration_verification_token"
+      });
+    }
+
+    const phone = normalizePhone(payload.phone);
+
+    const existing = await pool.query(
+      `SELECT id FROM users WHERE phone = $1 LIMIT 1`,
+      [phone]
+    );
+
+    if (existing.rowCount) {
+      return res.status(409).json({
+        ok: false,
+        error: "phone_already_registered"
+      });
+    }
+
     const result = await pool.query(
-      `INSERT INTO users (phone, role, status, password_hash)
-       VALUES ($1, $2::user_role, 'active'::user_status, $3)
-       RETURNING id, phone, role, status, created_at`,
-      [phone, role, passwordHash]
+      `INSERT INTO users
+        (phone, role, status, phone_verified_at)
+       VALUES
+        ($1, 'passenger'::user_role, 'active'::user_status, NOW())
+       RETURNING id, phone, role, status, phone_verified_at, created_at`,
+      [phone]
     );
 
     const user = result.rows[0];
 
-    if (user.role === "passenger") {
-      await pool.query(
-        `INSERT INTO passenger_profiles (user_id)
-         VALUES ($1)
-         ON CONFLICT (user_id) DO NOTHING`,
-        [user.id]
-      );
-    } else if (user.role === "driver") {
-      await pool.query(
-        `INSERT INTO driver_profiles (user_id)
-         VALUES ($1)
-         ON CONFLICT (user_id) DO NOTHING`,
-        [user.id]
-      );
+    await pool.query(
+      `INSERT INTO passenger_profiles (user_id)
+       VALUES ($1)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [user.id]
+    );
+
+    const tokens = await issueTokens(user);
+
+    return res.status(201).json({
+      ok: true,
+      user: publicUser(user),
+      ...tokens
+    });
+  } catch (error: any) {
+    const message =
+      error?.message === "JWT_SECRET is missing or too short"
+        ? "تنظیم JWT_SECRET در .env لازم است"
+        : (error?.message ?? "خطا در تکمیل ثبت نام");
+
+    return res.status(400).json({
+      ok: false,
+      error: message
+    });
+  }
+});
+
+router.post("/register", async (req, res) => {
+  try {
+    const requestedRole = String(req.body?.role ?? "passenger").toLowerCase();
+
+    if (requestedRole !== "driver") {
+      return res.status(410).json({
+        ok: false,
+        error: "passenger_registration_use_otp"
+      });
+    }
+
+    const phone = normalizePhone(req.body?.phone);
+    const password = validatePassword(req.body?.password);
+
+    const existing = await pool.query(
+      `SELECT id FROM users WHERE phone = $1 LIMIT 1`,
+      [phone]
+    );
+
+    if (existing.rowCount) {
+      return res.status(409).json({
+        ok: false,
+        error: "این شماره قبلا ثبت شده است"
+      });
+    }
+
+    const passwordHash = await hashPassword(password);
+
+    const result = await pool.query(
+      `INSERT INTO users
+        (phone, role, status, password_hash, phone_verified_at)
+       VALUES
+        ($1, 'driver'::user_role, 'active'::user_status, $2, NOW())
+       RETURNING id, phone, role, status, phone_verified_at, created_at`,
+      [phone, passwordHash]
+    );
+
+    const user = result.rows[0];
+
+    await pool.query(
+      `INSERT INTO driver_profiles (user_id)
+       VALUES ($1)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [user.id]
+    );
+
+    const tokens = await issueTokens(user);
+
+    return res.status(201).json({
+      ok: true,
+      user: publicUser(user),
+      ...tokens
+    });
+  } catch (error: any) {
+    const message =
+      error?.message === "JWT_SECRET is missing or too short"
+        ? "تنظیم JWT_SECRET در .env لازم است"
+        : (error?.message ?? "خطا در ثبت نام");
+
+    return res.status(400).json({
+      ok: false,
+      error: message
+    });
+  }
+});
+
+router.post("/login/request-otp", async (req, res) => {
+  try {
+    const phone = normalizePhone(req.body?.phone);
+
+    const existing = await pool.query(
+      `SELECT id, status FROM users WHERE phone = $1 LIMIT 1`,
+      [phone]
+    );
+
+    if (!existing.rowCount) {
+      return res.status(404).json({
+        ok: false,
+        error: "account_not_found"
+      });
+    }
+
+    if (existing.rows[0].status !== "active") {
+      return res.status(403).json({
+        ok: false,
+        error: "account_not_active"
+      });
+    }
+
+    const smsProvider = getSmsProvider();
+
+    if (!smsProvider) {
+      return res.status(503).json({
+        ok: false,
+        error: "sms_provider_not_configured"
+      });
+    }
+
+    const otp = await createOtp(phone, "login");
+
+    const smsResult = await smsProvider.sendOtp({
+      phone,
+      code: otp.code,
+      locale: String(req.body?.locale ?? "fa")
+    });
+
+    if (!smsResult.success) {
+      return res.status(502).json({
+        ok: false,
+        error: "sms_send_failed"
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      phone,
+      expires_at: otp.expires_at,
+      message: "otp_sent",
+      provider_message_id: smsResult.providerMessageId
+    });
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "otp_error"
+    });
+  }
+});
+
+router.post("/login/verify-otp", async (req, res) => {
+  try {
+    const phone = normalizePhone(req.body?.phone);
+    const code = String(req.body?.code ?? "").trim();
+
+    await verifyOtp(phone, code, "login");
+
+    const result = await pool.query(
+      `SELECT id, phone, role, status, created_at, phone_verified_at
+       FROM users
+       WHERE phone = $1
+       LIMIT 1`,
+      [phone]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({
+        ok: false,
+        error: "account_not_found"
+      });
+    }
+
+    const user = result.rows[0];
+
+    if (user.status !== "active") {
+      return res.status(403).json({
+        ok: false,
+        error: "account_not_active"
+      });
     }
 
     const tokens = await issueTokens(user);
 
-    return res.status(201).json({ ok: true, user: publicUser(user), ...tokens });
+    return res.json({
+      ok: true,
+      user: publicUser(user),
+      ...tokens
+    });
   } catch (error: any) {
-    const message = error?.message === "JWT_SECRET is missing or too short"
-      ? "تنظیم JWT_SECRET در .env لازم است"
-      : (error?.message ?? "خطا در ثبت نام");
-    return res.status(400).json({ ok: false, error: message });
+    const message =
+      error?.message === "JWT_SECRET is missing or too short"
+        ? "تنظیم JWT_SECRET در .env لازم است"
+        : (error?.message ?? "خطا در ورود با کد تایید");
+
+    return res.status(400).json({
+      ok: false,
+      error: message
+    });
   }
 });
 
@@ -126,19 +412,43 @@ router.post("/login", async (req, res) => {
     const result = await pool.query(
       `SELECT id, phone, role, status, created_at, password_hash,
               failed_login_count, locked_until
-       FROM users WHERE phone = $1 LIMIT 1`,
+       FROM users
+       WHERE phone = $1
+       LIMIT 1`,
       [phone]
     );
+
     if (!result.rowCount) {
-      return res.status(401).json({ ok: false, error: "شماره یا رمز عبور اشتباه است" });
+      return res.status(401).json({
+        ok: false,
+        error: "شماره یا رمز عبور اشتباه است"
+      });
     }
 
     const user = result.rows[0];
-    if (user.locked_until && new Date(user.locked_until).getTime() > Date.now()) {
-      return res.status(423).json({ ok: false, error: "حساب موقتا قفل است" });
+
+    if (
+      user.locked_until &&
+      new Date(user.locked_until).getTime() > Date.now()
+    ) {
+      return res.status(423).json({
+        ok: false,
+        error: "حساب موقتا قفل است"
+      });
     }
+
     if (user.status !== "active") {
-      return res.status(403).json({ ok: false, error: "حساب فعال نیست" });
+      return res.status(403).json({
+        ok: false,
+        error: "حساب فعال نیست"
+      });
+    }
+
+    if (user.role === "passenger") {
+      return res.status(410).json({
+        ok: false,
+        error: "passenger_login_use_otp"
+      });
     }
 
     const valid = user.password_hash
@@ -150,19 +460,32 @@ router.post("/login", async (req, res) => {
         `UPDATE users
          SET failed_login_count = failed_login_count + 1,
              locked_until = CASE
-               WHEN failed_login_count + 1 >= 5 THEN NOW() + INTERVAL '15 minutes'
+               WHEN failed_login_count + 1 >= 5
+               THEN NOW() + INTERVAL '15 minutes'
                ELSE locked_until
              END
          WHERE id = $1`,
         [user.id]
       );
-      return res.status(401).json({ ok: false, error: "شماره یا رمز عبور اشتباه است" });
+
+      return res.status(401).json({
+        ok: false,
+        error: "شماره یا رمز عبور اشتباه است"
+      });
     }
 
     const tokens = await issueTokens(user);
-    return res.json({ ok: true, user: publicUser(user), ...tokens });
+
+    return res.json({
+      ok: true,
+      user: publicUser(user),
+      ...tokens
+    });
   } catch (error: any) {
-    return res.status(400).json({ ok: false, error: error?.message ?? "خطا در ورود" });
+    return res.status(400).json({
+      ok: false,
+      error: error?.message ?? "خطا در ورود"
+    });
   }
 });
 
