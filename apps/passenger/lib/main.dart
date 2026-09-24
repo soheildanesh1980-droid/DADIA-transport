@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'core/language/language_config.dart';
+import 'core/language/app_localization.dart';
 
 import 'core/auth/auth_service.dart';
 import 'core/config/app_config.dart';
@@ -14,16 +16,75 @@ void main() {
 final api = ApiClient();
 final auth = AuthService(api);
 
+
+class LanguageSelector extends StatelessWidget {
+  const LanguageSelector({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<AppLanguage>(
+      tooltip: 'Language',
+      icon: const Icon(Icons.language),
+      onSelected: (language) {
+        languageController.setLanguage(language.code);
+      },
+      itemBuilder: (context) {
+        return supportedLanguages.map((language) {
+          return PopupMenuItem<AppLanguage>(
+            value: language,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  language.flag,
+                  style: const TextStyle(fontSize: 22),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '${language.code} — ${language.name}',
+                  textDirection: TextDirection.ltr,
+                ),
+              ],
+            ),
+          );
+        }).toList();
+      },
+    );
+  }
+}
+
 class DadiaPassengerApp extends StatelessWidget {
   const DadiaPassengerApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'DADIA Passenger',
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
-      home: const LoginPage(),
+    return AnimatedBuilder(
+      animation: languageController,
+      builder: (context, _) {
+        final code = languageController.code;
+        final isRtl = code == 'FA' || code == 'AR';
+
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'DADIA Passenger',
+          theme: ThemeData(
+            useMaterial3: true,
+            colorSchemeSeed: Colors.indigo,
+          ),
+          locale: Locale(code.toLowerCase()),
+          supportedLocales: AppLocalization.supported
+              .map((e) => Locale(e.toLowerCase()))
+              .toList(),
+          builder: (context, child) {
+            return Directionality(
+              textDirection:
+                  isRtl ? TextDirection.rtl : TextDirection.ltr,
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
+          home: const LoginPage(),
+        );
+      },
     );
   }
 }
@@ -62,7 +123,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
-      title: 'ورود به دادیا',
+      title: AppLocalization.text(languageController.code, 'login_title'),
       child: Column(
         children: [
           phoneField(phone),
@@ -74,7 +135,7 @@ class _LoginPageState extends State<LoginPage> {
             width: double.infinity,
             child: FilledButton(
               onPressed: loading ? null : login,
-              child: Text(loading ? 'در حال ورود...' : 'ورود'),
+              child: Text(loading ? AppLocalization.text(languageController.code, 'loading') : AppLocalization.text(languageController.code, 'login')),
             ),
           ),
           const SizedBox(height: 10),
@@ -82,7 +143,7 @@ class _LoginPageState extends State<LoginPage> {
             onPressed: loading ? null : () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const RegisterPage()),
             ),
-            child: const Text('حساب ندارم؛ ثبت نام می‌کنم'),
+            child: Text(AppLocalization.text(languageController.code, 'register_account')),
           ),
         ],
       ),
@@ -146,24 +207,22 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
-      title: 'ثبت نام مسافر',
+      title: AppLocalization.text(languageController.code, 'register'),
       back: true,
       child: Column(
         children: [
           DropdownButtonFormField<CountryConfig>(
             initialValue: country,
             decoration: const InputDecoration(
-              labelText: 'کشور',
+              labelText: AppLocalization.text(languageController.code, 'country'),
               border: OutlineInputBorder(),
             ),
             isExpanded: true,
             items: CountryConfigs.supported.map((c) => DropdownMenuItem(
               value: c,
-              enabled: c.code == 'IR',
+              enabled: true,
               child: Text(
-                c.code == 'IR'
-                    ? '${c.name} - فعال'
-                    : '${c.name} - در انتظار فعال سازی Backend',
+                '${c.flag} ${c.code} ${c.dialCode} - ${c.name}',
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
@@ -171,7 +230,7 @@ class _RegisterPageState extends State<RegisterPage> {
             onChanged: loading ? null : (value) { if (value != null) setState(() => country = value); },
           ),
           const SizedBox(height: 14),
-          phoneField(phone, hint: 'شماره تلفن بدون کد کشور'),
+          phoneField(phone, hint: AppLocalization.text(languageController.code, 'phone')),
           const SizedBox(height: 14),
           if (error != null) errorText(error!),
           const SizedBox(height: 12),
@@ -179,7 +238,7 @@ class _RegisterPageState extends State<RegisterPage> {
             width: double.infinity,
             child: FilledButton(
               onPressed: loading ? null : register,
-              child: Text(loading ? 'در حال ارسال کد...' : 'دریافت کد تایید'),
+              child: Text(loading ? AppLocalization.text(languageController.code, 'loading') : AppLocalization.text(languageController.code, 'get_code')),
             ),
           ),
         ],
@@ -253,7 +312,8 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('دادیا | مسافر'),
-        actions: [IconButton(onPressed: logout, icon: const Icon(Icons.logout))],
+        actions: [
+        const LanguageSelector(),IconButton(onPressed: logout, icon: const Icon(Icons.logout))],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
