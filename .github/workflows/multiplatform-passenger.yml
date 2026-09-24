@@ -56,7 +56,6 @@ jobs:
           channel: stable
 
       - name: Enable Windows
-        run: flutter config --enable-windows
 
       - name: Generate Windows platform
         working-directory: apps/passenger
@@ -92,7 +91,6 @@ jobs:
           channel: stable
 
       - name: Enable macOS
-        run: flutter config --enable-macos
 
       - name: Generate macOS platform
         working-directory: apps/passenger
