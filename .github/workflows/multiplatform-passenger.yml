@@ -1,0 +1,153 @@
+name: DADIA Passenger Multiplatform
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "apps/passenger/**"
+      - ".github/workflows/multiplatform-passenger.yml"
+
+jobs:
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Enable Web
+        run: flutter config --enable-web
+
+      - name: Generate Web platform
+        working-directory: apps/passenger
+        run: flutter create --platforms=web .
+
+      - name: Analyze
+        working-directory: apps/passenger
+        run: flutter analyze
+
+      - name: Test
+        working-directory: apps/passenger
+        run: flutter test
+
+      - name: Build Web
+        working-directory: apps/passenger
+        run: flutter build web --release --dart-define=DADIA_API_BASE_URL=https://api.dadia.app
+
+      - name: Upload Web
+        uses: actions/upload-artifact@v4
+        with:
+          name: DADIA-Passenger-Web
+          path: apps/passenger/build/web
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Enable Windows
+        run: flutter config --enable-windows
+
+      - name: Generate Windows platform
+        working-directory: apps/passenger
+        run: flutter create --platforms=windows .
+
+      - name: Analyze
+        working-directory: apps/passenger
+        run: flutter analyze
+
+      - name: Test
+        working-directory: apps/passenger
+        run: flutter test
+
+      - name: Build Windows
+        working-directory: apps/passenger
+        run: flutter build windows --release --dart-define=DADIA_API_BASE_URL=https://api.dadia.app
+
+      - name: Upload Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: DADIA-Passenger-Windows
+          path: apps/passenger/build/windows/x64/runner/Release
+
+  macos:
+    name: macOS
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Enable macOS
+        run: flutter config --enable-macos
+
+      - name: Generate macOS platform
+        working-directory: apps/passenger
+        run: flutter create --platforms=macos .
+
+      - name: Analyze
+        working-directory: apps/passenger
+        run: flutter analyze
+
+      - name: Test
+        working-directory: apps/passenger
+        run: flutter test
+
+      - name: Build macOS
+        working-directory: apps/passenger
+        run: flutter build macos --release --dart-define=DADIA_API_BASE_URL=https://api.dadia.app
+
+      - name: Upload macOS
+        uses: actions/upload-artifact@v4
+        with:
+          name: DADIA-Passenger-macOS
+          path: apps/passenger/build/macos/Build/Products/Release
+
+  ios:
+    name: iOS
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Enable iOS
+        run: flutter config --enable-ios
+
+      - name: Generate iOS platform
+        working-directory: apps/passenger
+        run: flutter create --platforms=ios .
+
+      - name: Analyze
+        working-directory: apps/passenger
+        run: flutter analyze
+
+      - name: Test
+        working-directory: apps/passenger
+        run: flutter test
+
+      - name: Build iOS
+        working-directory: apps/passenger
+        run: flutter build ios --release --no-codesign --dart-define=DADIA_API_BASE_URL=https://api.dadia.app
+
+      - name: Upload iOS
+        uses: actions/upload-artifact@v4
+        with:
+          name: DADIA-Passenger-iOS
+          path: apps/passenger/build/ios/iphoneos
