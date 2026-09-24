@@ -2,7 +2,6 @@ import 'core/config/app_config.dart';
 import 'core/network/api_client.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 const apiBase = AppConfig.apiBaseUrl;
 
