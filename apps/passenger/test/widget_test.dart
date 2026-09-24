@@ -12,7 +12,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('ثبت نام مسافر'), findsOneWidget);
-    expect(find.text('ثبت نام'), findsOneWidget);
+    expect(find.text('دریافت کد تایید'), findsOneWidget);
     expect(find.text('کشور'), findsOneWidget);
   });
 }
