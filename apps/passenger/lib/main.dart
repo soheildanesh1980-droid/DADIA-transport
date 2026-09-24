@@ -5,6 +5,7 @@ import 'core/auth/auth_service.dart';
 import 'core/config/app_config.dart';
 import 'core/country/country_config.dart';
 import 'core/network/api_client.dart';
+import 'core/project/project_stages_page.dart';
 
 void main() {
   runApp(const DadiaPassengerApp());
@@ -265,6 +266,19 @@ class _HomePageState extends State<HomePage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          ListTile(
+            leading: const Icon(Icons.developer_mode),
+            title: const Text('مراحل توسعه DADIA'),
+            subtitle: const Text('مشاهده مراحل تکمیل شده ۱ تا ۳۸'),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ProjectStagesPage(),
+                ),
+              );
+            },
+          ),
+
           const Card(child: Padding(padding: EdgeInsets.all(18), child: Text(
             'به اپلیکیشن Passenger دادیا خوش آمدید.', style: TextStyle(fontSize: 18),
           ))),
