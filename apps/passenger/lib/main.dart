@@ -154,10 +154,17 @@ class _RegisterPageState extends State<RegisterPage> {
               labelText: 'کشور',
               border: OutlineInputBorder(),
             ),
+            isExpanded: true,
             items: CountryConfigs.supported.map((c) => DropdownMenuItem(
               value: c,
               enabled: c.code == 'IR',
-              child: Text(c.code == 'IR' ? '${c.name} - فعال' : '${c.name} - در انتظار فعال سازی Backend'),
+              child: Text(
+                c.code == 'IR'
+                    ? '${c.name} - فعال'
+                    : '${c.name} - در انتظار فعال سازی Backend',
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
             )).toList(),
             onChanged: loading ? null : (value) { if (value != null) setState(() => country = value); },
           ),
