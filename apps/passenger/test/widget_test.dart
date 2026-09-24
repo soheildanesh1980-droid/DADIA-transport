@@ -1,9 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dadia_passenger/main.dart';
+import 'package:dadia_passenger/core/language/app_localization.dart';
+
 
 void main() {
   testWidgets('DADIA Passenger login and registration are available',
       (WidgetTester tester) async {
+    languageController.setLanguage('FA');
     await tester.pumpWidget(const DadiaPassengerApp());
 
     expect(find.text('ورود به دادیا'), findsOneWidget);
