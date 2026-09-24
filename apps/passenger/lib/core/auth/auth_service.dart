@@ -14,51 +14,48 @@ class AuthService {
   AuthState get state => _state;
   bool get isAuthenticated => _session?.isValid ?? false;
 
-  Future<AuthSession> login(
-    String phone,
-    String password,
-  ) async {
+  DateTime? _parseExpiry(Map<String, dynamic> data) {
+    final value = data['expiresAt'] ?? data['expires_at'];
+    return value is String ? DateTime.tryParse(value) : null;
+  }
+
+  AuthSession _setSession(Map<String, dynamic> data) {
+    final accessToken = data['accessToken'] ?? data['access_token'];
+    if (accessToken is! String || accessToken.isEmpty) {
+      throw Exception('AUTH_TOKEN_MISSING');
+    }
+
+    final refreshToken = data['refreshToken'] ?? data['refresh_token'];
+    _session = AuthSession(
+      accessToken: accessToken,
+      refreshToken: refreshToken is String ? refreshToken : null,
+      expiresAt: _parseExpiry(data),
+    );
+    _state = const AuthState.authenticated();
+    return _session!;
+  }
+
+  Future<AuthSession> login(String phone, String password) async {
     _state = const AuthState.loading();
-
     try {
-      final data = await apiClient.login(phone, password);
-
-      final accessToken =
-          data['accessToken'] ?? data['access_token'];
-
-      if (accessToken is! String || accessToken.isEmpty) {
-        throw Exception('AUTH_TOKEN_MISSING');
-      }
-
-      final refreshToken =
-          data['refreshToken'] ?? data['refresh_token'];
-
-      final expiresAtValue =
-          data['expiresAt'] ?? data['expires_at'];
-
-      DateTime? expiresAt;
-      if (expiresAtValue is String) {
-        expiresAt = DateTime.tryParse(expiresAtValue);
-      }
-
-      _session = AuthSession(
-        accessToken: accessToken,
-        refreshToken:
-            refreshToken is String ? refreshToken : null,
-        expiresAt: expiresAt,
-      );
-
-      _state = const AuthState.authenticated();
-      return _session!;
+      return _setSession(await apiClient.login(phone, password));
     } catch (error) {
       _state = AuthState.error(error.toString());
       rethrow;
     }
   }
 
-  Future<Map<String, dynamic>> me() {
-    return apiClient.me();
+  Future<AuthSession> register(String phone, String password) async {
+    _state = const AuthState.loading();
+    try {
+      return _setSession(await apiClient.register(phone, password));
+    } catch (error) {
+      _state = AuthState.error(error.toString());
+      rethrow;
+    }
   }
+
+  Future<Map<String, dynamic>> me() => apiClient.me();
 
   void logout() {
     _session = null;

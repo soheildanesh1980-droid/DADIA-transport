@@ -69,6 +69,37 @@ class ApiClient {
     return {'Authorization': 'Bearer $token'};
   }
 
+  Future<Map<String, dynamic>> register(
+    String phone,
+    String password,
+  ) async {
+    final response = await request(
+      'POST',
+      '/auth/register',
+      body: {
+        'phone': phone,
+        'password': password,
+        'role': 'passenger',
+      },
+    );
+
+    final data = jsonDecode(response.body);
+    if (data is! Map<String, dynamic>) {
+      throw Exception('INVALID_API_RESPONSE');
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(data['error']?.toString() ?? 'ثبت نام ناموفق بود');
+    }
+
+    final token = data['accessToken'] ?? data['access_token'];
+    if (token is String && token.isNotEmpty) {
+      accessToken = token;
+    }
+
+    return data;
+  }
+
   Future<Map<String, dynamic>> login(
     String phone,
     String password,
