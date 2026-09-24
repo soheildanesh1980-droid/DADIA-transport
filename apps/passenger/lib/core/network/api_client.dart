@@ -7,6 +7,7 @@ import '../config/app_config.dart';
 
 class ApiClient {
   final http.Client _client;
+  String? accessToken;
 
   ApiClient({http.Client? client}) : _client = client ?? http.Client();
 
@@ -60,18 +61,78 @@ class ApiClient {
     throw Exception('NETWORK_REQUEST_FAILED: $lastError');
   }
 
-  Future<http.Response> get(
-    String path, {
-    Map<String, String>? headers,
-  }) =>
-      request('GET', path, headers: headers);
+  Map<String, String> _authHeaders() {
+    final token = accessToken;
+    if (token == null || token.isEmpty) {
+      return {};
+    }
+    return {'Authorization': 'Bearer $token'};
+  }
 
-  Future<http.Response> post(
-    String path, {
-    Map<String, String>? headers,
-    Object? body,
-  }) =>
-      request('POST', path, headers: headers, body: body);
+  Future<Map<String, dynamic>> login(
+    String phone,
+    String password,
+  ) async {
+    final response = await request(
+      'POST',
+      '/auth/login',
+      body: {
+        'phone': phone,
+        'password': password,
+      },
+    );
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        data['error']?.toString() ?? 'ورود ناموفق بود',
+      );
+    }
+
+    final token =
+        data['accessToken'] ?? data['access_token'];
+
+    if (token is String && token.isNotEmpty) {
+      accessToken = token;
+    }
+
+    return data;
+  }
+
+  Future<Map<String, dynamic>> me() async {
+    return _getJson('/auth/me');
+  }
+
+  Future<Map<String, dynamic>> trips() async {
+    return _getJson('/passenger/trips');
+  }
+
+  Future<Map<String, dynamic>> activeTrip() async {
+    return _getJson('/passenger/trips/active');
+  }
+
+  Future<Map<String, dynamic>> _getJson(String path) async {
+    final response = await request(
+      'GET',
+      path,
+      headers: _authHeaders(),
+    );
+
+    final decoded = jsonDecode(response.body);
+
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception('INVALID_API_RESPONSE');
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        decoded['error']?.toString() ?? 'درخواست ناموفق بود',
+      );
+    }
+
+    return decoded;
+  }
 
   void dispose() {
     _client.close();

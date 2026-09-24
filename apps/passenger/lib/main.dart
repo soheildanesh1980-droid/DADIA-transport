@@ -27,41 +27,14 @@ class DadiaPassengerApp extends StatelessWidget {
   }
 }
 
-class PassengerApi {
-  final ApiClient _api;
 
-  PassengerApi(this._api);
+final api = ApiClient();
 
-  Future<http.Response> login(String phone, String password) {
-    return _api.post(
-      '/auth/login',
-      body: {
-        'phone': phone,
-        'password': password,
-      },
-    );
-  }
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
 
-  Future<http.Response> me(String token) {
-    return _api.get(
-      '/auth/me',
-      headers: {'Authorization': 'Bearer $token'},
-    );
-  }
-
-  Future<http.Response> trips(String token) {
-    return _api.get(
-      '/passenger/trips',
-      headers: {'Authorization': 'Bearer $token'},
-    );
-  }
-
-  Future<http.Response> activeTrip(String token) {
-    return _api.get(
-      '/passenger/trips/active',
-      headers: {'Authorization': 'Bearer $token'},
-    );
-  }
+  @override
+  State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
