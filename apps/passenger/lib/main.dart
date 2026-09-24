@@ -1,4 +1,5 @@
 import 'core/config/app_config.dart';
+import 'core/network/api_client.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -26,99 +27,41 @@ class DadiaPassengerApp extends StatelessWidget {
   }
 }
 
-class ApiClient {
-  String? accessToken;
+class PassengerApi {
+  final ApiClient _api;
 
-  Map<String, String> get headers => {
-        'Content-Type': 'application/json',
-        if (accessToken != null) 'Authorization': 'Bearer $accessToken',
-      };
+  PassengerApi(this._api);
 
-  Future<Map<String, dynamic>> login(
-      String phone, String password) async {
-    final response = await http.post(
-      Uri.parse('$apiBase/auth/login'),
-      headers: headers,
-      body: jsonEncode({
+  Future<http.Response> login(String phone, String password) {
+    return _api.post(
+      '/auth/login',
+      body: {
         'phone': phone,
         'password': password,
-      }),
+      },
     );
-
-    final data = _json(response);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(data['error'] ?? 'ورود ناموفق بود');
-    }
-
-    accessToken = data['accessToken'] ??
-        data['access_token'] ??
-        data['token'] ??
-        data['data']?['accessToken'];
-
-    if (accessToken == null) {
-      throw Exception('توکن ورود از سرور دریافت نشد');
-    }
-
-    return data;
   }
 
-  Future<Map<String, dynamic>> me() async {
-    final response = await http.get(
-      Uri.parse('$apiBase/auth/me'),
-      headers: headers,
+  Future<http.Response> me(String token) {
+    return _api.get(
+      '/auth/me',
+      headers: {'Authorization': 'Bearer $token'},
     );
-    final data = _json(response);
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(data['error'] ?? 'دریافت پروفایل ناموفق بود');
-    }
-    return data;
   }
 
-  Future<Map<String, dynamic>> trips() async {
-    final response = await http.get(
-      Uri.parse('$apiBase/passenger/trips'),
-      headers: headers,
+  Future<http.Response> trips(String token) {
+    return _api.get(
+      '/passenger/trips',
+      headers: {'Authorization': 'Bearer $token'},
     );
-    final data = _json(response);
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(data['error'] ?? 'دریافت سفرها ناموفق بود');
-    }
-    return data;
   }
 
-  Future<Map<String, dynamic>> activeTrip() async {
-    final response = await http.get(
-      Uri.parse('$apiBase/passenger/trips/active'),
-      headers: headers,
+  Future<http.Response> activeTrip(String token) {
+    return _api.get(
+      '/passenger/trips/active',
+      headers: {'Authorization': 'Bearer $token'},
     );
-    final data = _json(response);
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(data['error'] ?? 'دریافت سفر فعال ناموفق بود');
-    }
-    return data;
   }
-
-  Map<String, dynamic> _json(http.Response response) {
-    if (response.body.isEmpty) return {};
-    try {
-      final value = jsonDecode(response.body);
-      return value is Map<String, dynamic> ? value : {'data': value};
-    } catch (_) {
-      return {'error': response.body};
-    }
-  }
-}
-
-final api = ApiClient();
-
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
-
-  @override
-  State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
