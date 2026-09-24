@@ -29,6 +29,7 @@ jobs:
           if [ ! -d android ]; then
             flutter create . --platforms=android --project-name=dadia_passenger
           fi
+          rm -f test/widget_test.dart
 
       - name: Get dependencies
         working-directory: apps/passenger
@@ -37,6 +38,10 @@ jobs:
       - name: Analyze
         working-directory: apps/passenger
         run: flutter analyze
+
+      - name: Flutter test
+        working-directory: apps/passenger
+        run: flutter test
 
       - name: Build ARM64 APK
         working-directory: apps/passenger
