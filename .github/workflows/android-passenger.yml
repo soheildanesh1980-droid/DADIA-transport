@@ -1,0 +1,60 @@
+name: DADIA Passenger Android
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "apps/passenger/**"
+      - ".github/workflows/android-passenger.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build-passenger:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Create Android Flutter project
+        working-directory: apps/passenger
+        run: |
+          if [ ! -d android ]; then
+            flutter create . --platforms=android --project-name=dadia_passenger
+          fi
+
+      - name: Get dependencies
+        working-directory: apps/passenger
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: apps/passenger
+        run: flutter analyze
+
+      - name: Build ARM64 APK
+        working-directory: apps/passenger
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DADIA-Passenger-Android
+          path: apps/passenger/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+      - name: Commit generated Android project
+        run: |
+          if [ -n "$(git status --porcelain apps/passenger)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add apps/passenger
+            git commit -m "build: generate Flutter Android project"
+            git push
+          fi
