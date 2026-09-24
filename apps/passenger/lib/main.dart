@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/language/language_config.dart';
 import 'core/language/app_localization.dart';
 
@@ -75,6 +76,7 @@ class DadiaPassengerApp extends StatelessWidget {
           supportedLocales: AppLocalization.supported
               .map((e) => Locale(e.toLowerCase()))
               .toList(),
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
           builder: (context, child) {
             return Directionality(
               textDirection:
