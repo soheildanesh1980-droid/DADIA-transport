@@ -1134,7 +1134,7 @@ Widget countryField({
       CountryConfig>(
     initialValue: value,
     decoration:
-        const InputDecoration(
+        InputDecoration(
       labelText: uiText(languageController.code, 'country'),
       border:
           OutlineInputBorder(),
