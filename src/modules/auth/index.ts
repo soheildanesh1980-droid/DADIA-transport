@@ -76,7 +76,7 @@ router.post("/register/request-otp", async (req, res) => {
       });
     }
 
-    const smsProvider = getSmsProvider();
+    const smsProvider = getSmsProvider(phone);
 
     if (!smsProvider) {
       return res.status(503).json({
@@ -314,7 +314,7 @@ router.post("/login/request-otp", async (req, res) => {
       });
     }
 
-    const smsProvider = getSmsProvider();
+    const smsProvider = getSmsProvider(phone);
 
     if (!smsProvider) {
       return res.status(503).json({

@@ -67,4 +67,11 @@ class CountryConfigs {
       flag: '🇮🇶',
     ),
   ];
+
+  static CountryConfig byCode(String code) {
+    return supported.firstWhere(
+      (country) => country.code == code.toUpperCase(),
+      orElse: () => supported.first,
+    );
+  }
 }

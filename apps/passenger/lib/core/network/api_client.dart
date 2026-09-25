@@ -12,7 +12,8 @@ class ApiClient {
   ApiClient({http.Client? client}) : _client = client ?? http.Client();
 
   Uri _uri(String path) {
-    final base = AppConfig.apiBaseUrl.replaceFirst(RegExp(r'/$'), '');
+    final base =
+        AppConfig.apiBaseUrl.replaceFirst(RegExp(r'/$'), '');
     return Uri.parse('$base$path');
   }
 
@@ -43,7 +44,8 @@ class ApiClient {
             .send(request)
             .timeout(const Duration(seconds: 30));
 
-        final response = await http.Response.fromStream(streamed);
+        final response =
+            await http.Response.fromStream(streamed);
 
         if (response.statusCode < 500 || attempt == retries) {
           return response;
@@ -58,41 +60,123 @@ class ApiClient {
       );
     }
 
-    throw Exception('NETWORK_REQUEST_FAILED: $lastError');
+    throw Exception(
+      'NETWORK_REQUEST_FAILED: $lastError',
+    );
   }
 
   Map<String, String> _authHeaders() {
     final token = accessToken;
+
     if (token == null || token.isEmpty) {
       return {};
     }
-    return {'Authorization': 'Bearer $token'};
+
+    return {
+      'Authorization': 'Bearer $token',
+    };
   }
 
-  Future<Map<String, dynamic>> register(
-    String phone,
-    String password,
-  ) async {
+  Map<String, dynamic> _decode(http.Response response) {
+    try {
+      final decoded = jsonDecode(response.body);
+
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('INVALID_API_RESPONSE');
+      }
+
+      return decoded;
+    } catch (_) {
+      throw Exception(
+        'INVALID_API_RESPONSE:${response.statusCode}',
+      );
+    }
+  }
+
+  void _throwIfFailed(
+    http.Response response,
+    Map<String, dynamic> data,
+    String fallback,
+  ) {
+    if (response.statusCode < 200 ||
+        response.statusCode >= 300) {
+      throw Exception(
+        data['error']?.toString() ?? fallback,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> requestRegisterOtp(
+    String phone, {
+    String locale = 'fa',
+  }) async {
     final response = await request(
       'POST',
-      '/auth/register',
+      '/auth/register/request-otp',
       body: {
         'phone': phone,
-        'password': password,
         'role': 'passenger',
+        'locale': locale,
       },
     );
 
-    final data = jsonDecode(response.body);
-    if (data is! Map<String, dynamic>) {
-      throw Exception('INVALID_API_RESPONSE');
-    }
+    final data = _decode(response);
 
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(data['error']?.toString() ?? 'ثبت نام ناموفق بود');
-    }
+    _throwIfFailed(
+      response,
+      data,
+      'ارسال کد تایید ناموفق بود',
+    );
 
-    final token = data['accessToken'] ?? data['access_token'];
+    return data;
+  }
+
+  Future<Map<String, dynamic>> verifyRegisterOtp(
+    String phone,
+    String code,
+  ) async {
+    final response = await request(
+      'POST',
+      '/auth/register/verify-otp',
+      body: {
+        'phone': phone,
+        'code': code,
+      },
+    );
+
+    final data = _decode(response);
+
+    _throwIfFailed(
+      response,
+      data,
+      'کد تایید نامعتبر است',
+    );
+
+    return data;
+  }
+
+  Future<Map<String, dynamic>> completeRegister(
+    String verificationToken,
+  ) async {
+    final response = await request(
+      'POST',
+      '/auth/register/complete-otp',
+      body: {
+        'verificationToken': verificationToken,
+      },
+    );
+
+    final data = _decode(response);
+
+    _throwIfFailed(
+      response,
+      data,
+      'تکمیل ثبت نام ناموفق بود',
+    );
+
+    final token =
+        data['accessToken'] ?? data['access_token'];
+
     if (token is String && token.isNotEmpty) {
       accessToken = token;
     }
@@ -100,26 +184,50 @@ class ApiClient {
     return data;
   }
 
-  Future<Map<String, dynamic>> login(
-    String phone,
-    String password,
-  ) async {
+  Future<Map<String, dynamic>> requestLoginOtp(
+    String phone, {
+    String locale = 'fa',
+  }) async {
     final response = await request(
       'POST',
-      '/auth/login',
+      '/auth/login/request-otp',
       body: {
         'phone': phone,
-        'password': password,
+        'locale': locale,
       },
     );
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = _decode(response);
 
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(
-        data['error']?.toString() ?? 'ورود ناموفق بود',
-      );
-    }
+    _throwIfFailed(
+      response,
+      data,
+      'ارسال کد ورود ناموفق بود',
+    );
+
+    return data;
+  }
+
+  Future<Map<String, dynamic>> verifyLoginOtp(
+    String phone,
+    String code,
+  ) async {
+    final response = await request(
+      'POST',
+      '/auth/login/verify-otp',
+      body: {
+        'phone': phone,
+        'code': code,
+      },
+    );
+
+    final data = _decode(response);
+
+    _throwIfFailed(
+      response,
+      data,
+      'کد ورود نامعتبر است',
+    );
 
     final token =
         data['accessToken'] ?? data['access_token'];
@@ -143,24 +251,22 @@ class ApiClient {
     return _getJson('/passenger/trips/active');
   }
 
-  Future<Map<String, dynamic>> _getJson(String path) async {
+  Future<Map<String, dynamic>> _getJson(
+    String path,
+  ) async {
     final response = await request(
       'GET',
       path,
       headers: _authHeaders(),
     );
 
-    final decoded = jsonDecode(response.body);
+    final decoded = _decode(response);
 
-    if (decoded is! Map<String, dynamic>) {
-      throw Exception('INVALID_API_RESPONSE');
-    }
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(
-        decoded['error']?.toString() ?? 'درخواست ناموفق بود',
-      );
-    }
+    _throwIfFailed(
+      response,
+      decoded,
+      'درخواست ناموفق بود',
+    );
 
     return decoded;
   }
