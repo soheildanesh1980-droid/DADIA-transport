@@ -486,7 +486,8 @@ class RegisterPage
 }
 
 class _RegisterPageState
-    extends State<RegisterPage> {
+    extends State<RegisterPage>
+    with LanguageAwareState<RegisterPage> {
   final phone =
       TextEditingController();
 
@@ -635,7 +636,8 @@ class OtpPage extends StatefulWidget {
 }
 
 class _OtpPageState
-    extends State<OtpPage> {
+    extends State<OtpPage>
+    with LanguageAwareState<OtpPage> {
   final code =
       TextEditingController();
 
