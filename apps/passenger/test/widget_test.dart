@@ -11,9 +11,9 @@ void main() {
       await tester.pumpWidget(const DadiaPassengerApp());
 
       expect(find.text('ورود به دادیا'), findsOneWidget);
-      expect(find.text('حساب ندارم؛ ثبت نام می‌کنم'), findsOneWidget);
+      expect(find.text('حساب ندارم؛ ثبت نام میکنم'), findsOneWidget);
 
-      await tester.tap(find.text('حساب ندارم؛ ثبت نام می‌کنم'));
+      await tester.tap(find.text('حساب ندارم؛ ثبت نام میکنم'));
       await tester.pumpAndSettle();
 
       expect(find.text('ثبت نام مسافر'), findsOneWidget);
