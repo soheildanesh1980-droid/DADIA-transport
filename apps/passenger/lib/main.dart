@@ -208,13 +208,31 @@ String buildFullPhone(
   return '${country.dialCode}$value';
 }
 
+mixin LanguageAwareState<T extends StatefulWidget> on State<T> {
+  void _languageChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    languageController.addListener(_languageChanged);
+  }
+
+  @override
+  void dispose() {
+    languageController.removeListener(_languageChanged);
+    super.dispose();
+  }
+}
+
 class LanguageSelector extends StatelessWidget {
   const LanguageSelector({super.key});
 
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<AppLanguage>(
-      tooltip: 'Language',
+      tooltip: uiText(languageController.code, 'language'),
       icon: const Icon(Icons.language),
       onSelected: (language) {
         languageController.setLanguage(
@@ -311,7 +329,7 @@ class LoginPage extends StatefulWidget {
       _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends State<LoginPage> with LanguageAwareState<LoginPage> {
   final phone =
       TextEditingController();
 
@@ -1115,7 +1133,7 @@ Widget countryField({
     initialValue: value,
     decoration:
         const InputDecoration(
-      labelText: 'Country',
+      labelText: uiText(languageController.code, 'country'),
       border:
           OutlineInputBorder(),
     ),
